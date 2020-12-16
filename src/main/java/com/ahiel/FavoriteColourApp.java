@@ -3,11 +3,16 @@ package com.ahiel;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.kstream.*;
+import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.KTable;
+import org.apache.kafka.streams.kstream.Named;
+import org.apache.kafka.streams.kstream.Produced;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
@@ -16,36 +21,32 @@ import java.util.concurrent.CountDownLatch;
  * @author Ahielg
  * @date 15/12/2020
  */
-public class WordCountApp {
-
-    public static final String INPUT_TOPIC = "word-count-input";
-    public static final String OUTPUT_TOPIC = "word-count-output";
+public class FavoriteColourApp {
+    public static final String INPUT_TOPIC = "favourite-colour-input";
+    public static final String OUTPUT_TOPIC = "favourite-colour-output";
+    public static final String INTERMEDIATE_TOPIC = "user-keys-and-colours";
+    private static final boolean devMode = true;
+    private static final List<String> AVAILABLE_COLOURS = Arrays.asList("green", "blue", "red");
 
     static void createWordCountStream(final StreamsBuilder builder) {
-        KStream<String, String> textLines = builder.stream(INPUT_TOPIC, Consumed.with(Serdes.String(), Serdes.String()));
-        KTable<String, Long> wordCounts = textLines
-                .mapValues((ValueMapper<String, String>) String::toLowerCase)
-                .flatMapValues(value -> Arrays.asList(value.split(" ")))
-                .selectKey((k, v) -> v)
-                .groupByKey()
-                .count();
+        //KStream<String, String> textLines =
+        builder.stream(INPUT_TOPIC, Consumed.with(Serdes.String(), Serdes.String()))
+                .filter((k, v) -> v.contains(","))
+                .mapValues(value -> value.toLowerCase(Locale.getDefault()))
+                .selectKey((k, v) -> v.split(",")[0])
+                .mapValues((k, v) -> v.split(",")[1])
+                .filter((user, colour) -> AVAILABLE_COLOURS.contains(colour))
+                .to(INTERMEDIATE_TOPIC);
 
+        KTable<String, String> table = builder.table(INTERMEDIATE_TOPIC);
 
-        // 7 - to in order to write the results back to kafka
-        wordCounts.toStream().to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
+        KTable<String, Long> favoriteColour = table
+                .groupBy((k, v) -> new KeyValue<>(v, v))
+                .count(Named.as("CountByColours"));
+
+        favoriteColour.toStream().to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
     }
 
-    static void createWordCountStream2(final StreamsBuilder builder) {
-        final KStream<String, String> source = builder.stream(INPUT_TOPIC);
-
-        final KTable<String, Long> counts = source
-                .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split(" ")))
-                .groupBy((key, value) -> value)
-                .count();
-
-        // need to override value serde to Long type
-        counts.toStream().to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
-    }
 
     public static void main(String[] args) {
         Properties config = getProps();
@@ -67,6 +68,10 @@ public class WordCountApp {
         });
 
         try {
+            if (devMode) {
+                streams.cleanUp();
+            }
+
             streams.start();
             latch.await();
         } catch (final Throwable e) {
@@ -78,11 +83,15 @@ public class WordCountApp {
 
     private static Properties getProps() {
         Properties config = new Properties();
-        config.setProperty(StreamsConfig.APPLICATION_ID_CONFIG, "wordcount-application");
+        config.setProperty(StreamsConfig.APPLICATION_ID_CONFIG, "favourite-colour-application");
         config.setProperty(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "127.0.0.1:9092");
         config.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.setProperty(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         config.setProperty(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+
+        if (devMode) {
+            config.setProperty(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, "0");
+        }
         return config;
     }
 }
