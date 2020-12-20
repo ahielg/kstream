@@ -42,6 +42,7 @@ public class FavoriteColourApp {
 
         KTable<String, Long> favoriteColour = table
                 .groupBy((k, v) -> new KeyValue<>(v, v))
+                //.groupBy((k, v) -> KeyValue.pair(v, v))
                 .count(Named.as("CountByColours"));
 
         favoriteColour.toStream().to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
@@ -88,6 +89,8 @@ public class FavoriteColourApp {
         config.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.setProperty(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         config.setProperty(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+        config.setProperty(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, StreamsConfig.EXACTLY_ONCE);
+        //config.setProperty(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "30000");
 
         if (devMode) {
             config.setProperty(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, "0");
