@@ -1,12 +1,12 @@
-package com.ahiel.bank.dto;
+package com.ahiel.simple.bank;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.ser.std.StringSerializer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.time.Instant;
 import java.util.Properties;
@@ -38,6 +38,7 @@ public class BankProducer {
         transaction.put("name", name);
         transaction.put("amount", amount);
         transaction.put("time", now.toString());
+        log.info(transaction.toString());
         return new ProducerRecord<>("bank-transactions", name, transaction.toString());
     }
 
