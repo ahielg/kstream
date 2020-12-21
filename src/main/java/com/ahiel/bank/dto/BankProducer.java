@@ -58,6 +58,7 @@ public class BankProducer {
 
         // high throughput producer (at the expense of a bit of latency and CPU usage)
         //properties.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
+        //not production - make sure it sends fast
         properties.setProperty(ProducerConfig.LINGER_MS_CONFIG, "1");
         //properties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, Integer.toString(32 * 1024)); // 32 KB batch size
 
@@ -84,7 +85,7 @@ public class BankProducer {
                 Thread.sleep(100);
                 producer.send(newRandomTransaction("alice"));
                 Thread.sleep(100);
-                i += 1;
+                i++;
             } catch (InterruptedException e) {
                 break;
             }
